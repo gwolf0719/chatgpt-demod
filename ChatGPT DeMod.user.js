@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         ChatGPT DeMod
+// @name         ChatGPT DeMod James
 // @namespace    com.gwolf0719.chatgpt
-// @version      1.0
+// @version      1.01
 // @description  Hides moderation results during conversations with ChatGPT
 // @author       gwolf0719
 // @match        *://chatgpt.com/*
@@ -50,4 +50,33 @@
 
         return original_response;
     };
+
+    // 攔截 WebSocket 消息
+    const original_websocket = window.WebSocket;
+    window.WebSocket = new Proxy(original_websocket, {
+        construct(target, args) {
+            const ws = new target(...args);
+
+            ws.addEventListener('message', event => {
+                const data = event.data;
+                if (data && typeof data === 'string') {
+                    if (data.includes('"moderation_response":')) {
+                        console.warn('檢測到無法回答問題');
+                    }
+                    const cleaned_data = clearFlagging(data);
+                    event.stopImmediatePropagation();
+                    const new_event = new MessageEvent('message', {
+                        data: cleaned_data,
+                        origin: event.origin,
+                        lastEventId: event.lastEventId,
+                        source: event.source,
+                        ports: event.ports
+                    });
+                    ws.dispatchEvent(new_event);
+                }
+            });
+
+            return ws;
+        }
+    });
 })();
